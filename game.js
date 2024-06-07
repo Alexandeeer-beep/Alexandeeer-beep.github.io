@@ -24,9 +24,6 @@ mimicTargetImage.src = 'Good-Diana.png'; // Usa la misma imagen que la buena
 function createAudio(src) {
     const audio = new Audio(src);
     audio.preload = 'auto';
-    audio.onerror = function(e) {
-        console.error(`Error al cargar el audio ${src}:`, e);
-    };
     return audio;
 }
 
@@ -39,9 +36,7 @@ const noAmmoSound = createAudio('Sin municion.mp3');
 let bgMusicList = ['BackGround.mp3', 'Background2.mp3', 'Background3.mp3'];
 let bgMusicIndex = 0;
 let bgMusic = new Audio(bgMusicList[bgMusicIndex]);
-bgMusic.loop = true;
-
-};
+bgMusic.loop = false;
 
 let targets = [];
 let score = 0;
@@ -208,209 +203,210 @@ function startGame() {
     noAmmoMessage.style.position = 'absolute';
     noAmmoMessage.style.color = 'red';
     noAmmoMessage.style.fontWeight = 'bold';
+    noAmmoMessage.style.fontSize = '20px';
+    noAmmoMessage.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
+    noAmmoMessage.style.borderRadius = '5px';
     noAmmoMessage.style.display = 'none';
+    noAmmoMessage.textContent = 'SIN BALAS';
     gameContainer.appendChild(noAmmoMessage);
-}
-
-function gameOverScreenFunc() {
-    gameOver = true;
-    clearInterval(targetInterval);
-    clearInterval(difficultyIncreaseInterval);
-    cancelAnimationFrame(gameInterval);
-    gameOverScreen.style.display = 'block';
-    startButton.style.display = 'block';
-    highScoreBoard.textContent = 'Puntuación más alta: ' + highScore;
-    gameContainer.classList.remove('paused');
-    stopBackgroundMusic();
-}
-
-function updateGameState(deltaTime) {
-    if (isPaused) return;
-
-    targets.forEach(target => target.update(deltaTime));
-    targets = targets.filter(target => !target.exploding);
-}
-
-function drawGame() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    targets.forEach(target => target.draw());
 }
 
 function gameLoop(timestamp) {
     const deltaTime = timestamp - lastTime;
     lastTime = timestamp;
 
-    updateGameState(deltaTime);
-    drawGame();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    targets.forEach(target => target.update(deltaTime));
+    targets = targets.filter(target => !target.exploding);
+    targets.forEach(target => target.draw());
 
     if (!gameOver) {
         gameInterval = requestAnimationFrame(gameLoop);
     }
 }
 
+function endGame() {
+    gameOver = true;
+    cancelAnimationFrame(gameInterval);
+    clearInterval(targetInterval);
+    clearInterval(difficultyIncreaseInterval);
+    gameOverScreen.style.display = 'block';
+    startButton.style.display = 'block';
+    gameContainer.classList.add('paused');
+    highScore = Math.max(score, highScore);
+    highScoreBoard.textContent = 'Mejor Puntuación: ' + highScore;
+    bgMusic.pause();
+}
+
 function increaseDifficulty() {
-    if (targetSpawnRate > 500) {
-        targetSpawnRate -= 100;
-        clearInterval(targetInterval);
-        targetInterval = setInterval(spawnTarget, targetSpawnRate);
-    }
+    targetSpawnRate = Math.max(500, targetSpawnRate - 100);
+    clearInterval(targetInterval);
+    targetInterval = setInterval(spawnTarget, targetSpawnRate);
 }
 
-canvas.addEventListener('click', (event) => {
-    if (!canInteract) return;
-    if (isPaused) return;
-
-    if (bullets > 0) {
-        const rect = canvas.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-        shotSound.currentTime = 0;
-        shotSound.play();
-        bullets--;
-        bulletBoard.textContent = 'Balas: ' + bullets;
-
-        let hit = false;
-        targets.forEach(target => {
-            if (target.isHit(mouseX, mouseY)) {
-                if (target.type === 'good') {
-                    score++;
-                    hitGoodSound.currentTime = 0;
-                    hitGoodSound.play();
-                } else if (target.type === 'goodFake') {
-                    score -= 2; // Penalización por buena falsa
-                    hitBadSound.currentTime = 0;
-                    hitBadSound.play();
-                } else if (target.type === 'bad') {
-                    score -= 5;
-                    hitBadSound.currentTime = 0;
-                    hitBadSound.play();
-                } else if (target.type === 'mimic') {
-                    score += 2; // Recompensa por acertar a la mímica
-                    hitGoodSound.currentTime = 0;
-                    hitGoodSound.play();
-                }
-                target.explode();
-                hit = true;
-            } else if (target.type === 'fleeing') {
-                target.flee(mouseX, mouseY); // Hacer que la diana huya
-            }
-        });
-
-        if (!hit && bullets === 0) {
-            noAmmoSound.currentTime = 0;
-            noAmmoSound.play();
-            noAmmoMessage.textContent = '¡Sin balas! Recarga para continuar.';
-            noAmmoMessage.style.display = 'block'; // Mostrar el mensaje sin balas
-            setTimeout(() => {
-                noAmmoMessage.style.display = 'none'; // Ocultar el mensaje después de unos segundos
-            }, 2000);
-        }
-    } else {
-        noAmmoSound.currentTime = 0;
-        noAmmoSound.play();
-        noAmmoMessage.textContent = '¡Sin balas! Recarga para continuar.';
-        noAmmoMessage.style.display = 'block'; // Mostrar el mensaje sin balas
-        setTimeout(() => {
-            noAmmoMessage.style.display = 'none'; // Ocultar el mensaje después de unos segundos
-        }, 2000);
-    }
-
-    scoreBoard.textContent = 'Puntos: ' + score;
-    if (score > highScore) {
-        highScore = score;
-    }
-});
-
-document.addEventListener('keydown', (event) => {
-    if (event.code === 'KeyR') {
-        reloadSound.currentTime = 0;
-        reloadSound.play();
-        bullets = 8;
-        bulletBoard.textContent = 'Balas: ' + bullets;
-    } else if (event.code === 'KeyP') {
-        togglePause();
-    }
-});
-
-function togglePause() {
-    if (gameOver) return;
-    isPaused = !isPaused;
-    if (isPaused) {
-        pauseOverlay.style.display = 'block';
-        stopBackgroundMusic();
-    } else {
-        pauseOverlay.style.display = 'none';
-        lastTime = performance.now();
-        gameInterval = requestAnimationFrame(gameLoop);
-        playBackgroundMusic();
-    }
-    gameContainer.classList.toggle('paused');
-}
-
-resumeButton.addEventListener('click', () => {
-    togglePause();
-});
-
-volumeSlider.addEventListener('input', (event) => {
-    volumeLevel = event.target.value;
-    adjustVolume(volumeLevel);
-});
-
-function adjustVolume(level) {
-    shotSound.volume = level;
-    hitGoodSound.volume = level;
-    hitBadSound.volume = level;
-    reloadSound.volume = level;
-    noAmmoSound.volume = level;
-    bgMusic.volume = level;
+function restartGame() {
+    endGame(); // Termina el juego actual
+    startGame(); // Inicia un nuevo juego
 }
 
 function playBackgroundMusic() {
-    if (!bgMusic) return;
-    bgMusic.play().catch((error) => {
-        console.error('Error al reproducir la música de fondo:', error);
-    });
+    bgMusic.src = bgMusicList[bgMusicIndex];
+    bgMusic.volume = volumeLevel;
+    bgMusic.play();
     bgMusic.onended = function() {
         bgMusicIndex = (bgMusicIndex + 1) % bgMusicList.length;
-        bgMusic = new Audio(bgMusicList[bgMusicIndex]);
-        bgMusic.loop = false;
-        bgMusic.volume = volumeLevel;
         playBackgroundMusic();
     };
 }
 
-function stopBackgroundMusic() {
-    if (!bgMusic) return;
+function playSound(sound) {
+    const audio = sound.cloneNode(); // Clona el nodo de audio para permitir múltiples reproducciones
+    audio.volume = volumeLevel;
+    audio.play();
+}
+
+canvas.addEventListener('click', event => {
+    if (gameOver || isPaused) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    if (bullets > 0) {
+        let hitTarget = false;
+        targets.forEach(target => {
+            if (target.isHit(x, y) && !hitTarget) {
+                hitTarget = true;
+                if (target.type === 'good') {
+                    playSound(hitGoodSound);
+                    score += 10;
+                    target.explode();
+                } else if (target.type === 'bad' || target.type === 'mimic') {
+                    playSound(hitBadSound);
+                    endGame();
+                } else if (target.type === 'goodFake') {
+                    playSound(hitBadSound);
+                    score -= 5;
+                    target.explode();
+                }
+            }
+        });
+
+        playSound(shotSound);
+        bullets--;
+
+        if (bullets <= 0) {
+            canInteract = false;
+        }
+
+    } else {
+        playSound(noAmmoSound);
+        displayNoAmmoMessage(event.clientX, event.clientY); // Muestra el mensaje de sin balas
+    }
+
+    scoreBoard.textContent = 'Puntos: ' + score;
+    bulletBoard.textContent = 'Balas: ' + bullets;
+});
+
+canvas.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    playSound(reloadSound);
+    bullets = 8;
+    canInteract = true;
+    bulletBoard.textContent = 'Balas: ' + bullets;
+    noAmmoMessage.style.display = 'none'; // Ocultar mensaje de sin balas al recargar
+});
+
+canvas.addEventListener('mousemove', event => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
+    targets.forEach(target => {
+        if (target.type === 'fleeing') {
+            target.flee(mouseX, mouseY);
+        } else if (target.type === 'mimic') {
+            const dx = target.x + target.size / 2 - mouseX;
+            const dy = target.y + target.size / 2 - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < 100) {
+                target.switchToBad();
+            } else {
+                target.image = mimicTargetImage; // Vuelve a la imagen de mimic
+            }
+        }
+    });
+});
+
+document.addEventListener('keydown', event => {
+    if (event.code === 'KeyR') {
+        restartGame();
+    } else if (event.code === 'Escape' || event.code === 'Space') {
+        if (isPaused) {
+            resumeGame();
+        } else {
+            pauseGame();
+        }
+    }
+});
+
+function pauseGame() {
+    isPaused = true;
+    cancelAnimationFrame(gameInterval);
+    clearInterval(targetInterval);
+    clearInterval(difficultyIncreaseInterval);
+    pauseOverlay.style.display = 'block';
+    gameContainer.classList.add('paused');
     bgMusic.pause();
-    bgMusic.currentTime = 0;
 }
 
-function isMobileDevice() {
-    return /Mobi/i.test(navigator.userAgent);
+function resumeGame() {
+    isPaused = false;
+    lastTime = performance.now();
+    gameInterval = requestAnimationFrame(gameLoop);
+    targetInterval = setInterval(spawnTarget, targetSpawnRate);
+    difficultyIncreaseInterval = setInterval(increaseDifficulty, 10000);
+    pauseOverlay.style.display = 'none';
+    gameContainer.classList.remove('paused');
+    bgMusic.play();
 }
 
-if (isMobileDevice()) {
-    document.getElementById('reloadMessage').textContent = 'Toque con dos dedos para recargar';
-    document.addEventListener('touchstart', handleTouchStart, false);
-    document.addEventListener('touchend', handleTouchEnd, false);
-}
+resumeButton.addEventListener('click', resumeGame);
 
-let touchStartTime = 0;
-
-function handleTouchStart(event) {
-    if (event.touches.length === 2) {
-        touchStartTime = Date.now();
-    }
-}
-
-function handleTouchEnd(event) {
-    if (event.touches.length < 2 && touchStartTime && (Date.now() - touchStartTime < 500)) {
-        reloadSound.currentTime = 0;
-        reloadSound.play();
-        bullets = 8;
-        bulletBoard.textContent = 'Balas: ' + bullets;
-        touchStartTime = 0;
-    }
-}
+volumeSlider.addEventListener('input', () => {
+    volumeLevel = volumeSlider.value;
+    bgMusic.volume = volumeLevel;
+    shotSound.volume = volumeLevel;
+    hitGoodSound.volume = volumeLevel;
+    hitBadSound.volume = volumeLevel;
+    reloadSound.volume = volumeLevel;
+    noAmmoSound.volume = volumeLevel;
+});
 
 startButton.addEventListener('click', startGame);
+
+function displayNoAmmoMessage(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    
+    noAmmoMessage.style.left = `${x}px`;
+    noAmmoMessage.style.top = `${y}px`;
+    noAmmoMessage.style.display = 'block';
+
+    // Ocultar el mensaje después de 1 segundo
+    setTimeout(() => {
+        noAmmoMessage.style.display = 'none';
+    }, 1000);
+
+    // Disminuir las balas después de mostrar el mensaje
+    if (bullets <= 0) {
+        playSound(noAmmoSound);
+        bullets = 0; // Asegurarse de que las balas sean cero si ya no hay
+        bulletBoard.textContent = 'Balas: ' + bullets;
+    }
+    else {
+        playSound(noAmmoSound);
+        bullets--; // Disminuir las balas si todavía hay disponibles
+        bulletBoard.textContent = 'Balas: ' + bullets;
+    }
+}
