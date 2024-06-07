@@ -39,9 +39,8 @@ const noAmmoSound = createAudio('Sin municion.mp3');
 let bgMusicList = ['BackGround.mp3', 'Background2.mp3', 'Background3.mp3'];
 let bgMusicIndex = 0;
 let bgMusic = new Audio(bgMusicList[bgMusicIndex]);
-bgMusic.loop = false;
-bgMusic.onerror = function(e) {
-    console.error(`Error al cargar la música de fondo ${bgMusicList[bgMusicIndex]}:`, e);
+bgMusic.loop = true;
+
 };
 
 let targets = [];
