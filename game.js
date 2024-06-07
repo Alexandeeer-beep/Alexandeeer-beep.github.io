@@ -252,17 +252,31 @@ function restartGame() {
 function playBackgroundMusic() {
     bgMusic.src = bgMusicList[bgMusicIndex];
     bgMusic.volume = volumeLevel;
-    bgMusic.play();
+    bgMusic.loop = false; // Para manejar manualmente el loop
+    bgMusic.play().catch(error => {
+        console.error("Error al reproducir la música de fondo:", error);
+    });
+
     bgMusic.onended = function() {
         bgMusicIndex = (bgMusicIndex + 1) % bgMusicList.length;
         playBackgroundMusic();
+    };
+
+    bgMusic.onplay = function() {
+        console.log("Reproduciendo música de fondo:", bgMusic.src);
+    };
+
+    bgMusic.onerror = function(e) {
+        console.error("Error de audio:", e);
     };
 }
 
 function playSound(sound) {
     const audio = sound.cloneNode(); // Clona el nodo de audio para permitir múltiples reproducciones
     audio.volume = volumeLevel;
-    audio.play();
+    audio.play().catch(error => {
+        console.error("Error al reproducir el sonido:", error);
+    });
 }
 
 canvas.addEventListener('click', event => {
@@ -367,7 +381,9 @@ function resumeGame() {
     difficultyIncreaseInterval = setInterval(increaseDifficulty, 10000);
     pauseOverlay.style.display = 'none';
     gameContainer.classList.remove('paused');
-    bgMusic.play();
+    bgMusic.play().catch(error => {
+        console.error("Error al reanudar la música de fondo:", error);
+    });
 }
 
 resumeButton.addEventListener('click', resumeGame);
@@ -375,11 +391,9 @@ resumeButton.addEventListener('click', resumeGame);
 volumeSlider.addEventListener('input', () => {
     volumeLevel = volumeSlider.value;
     bgMusic.volume = volumeLevel;
-    shotSound.volume = volumeLevel;
-    hitGoodSound.volume = volumeLevel;
-    hitBadSound.volume = volumeLevel;
-    reloadSound.volume = volumeLevel;
-    noAmmoSound.volume = volumeLevel;
+    [shotSound, hitGoodSound, hitBadSound, reloadSound, noAmmoSound].forEach(sound => {
+        sound.volume = volumeLevel;
+    });
 });
 
 startButton.addEventListener('click', startGame);
